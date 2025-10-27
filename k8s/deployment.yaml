@@ -1,0 +1,47 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-blog-generator
+  namespace: ai-blog-generator
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: ai-blog-generator
+  template:
+    metadata:
+      labels:
+        app: ai-blog-generator
+    spec:
+      containers:
+      - name: ai-blog-generator
+        image: your-dockerhub-username/ai-blog-generator:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NEBIUS_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: ai-blog-secret
+              key: NEBIUS_API_KEY
+        - name: PORT
+          value: "3000"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
