@@ -1,69 +1,93 @@
 pipeline {
-    agent any
-    
-    environment {
-        DOCKER_IMAGE = 'ai-blog-generator'
-        DOCKER_TAG = "${BUILD_NUMBER}"
-        DOCKER_REGISTRY = credentials('docker-hub-credentials')
+  agent any
+  environment {
+    AWS_REGION = 'us-east-1'
+    AWS_ACCOUNT_ID = '248547463735'
+    ECR = '${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/myapp-ecr'
+    CLUSTER = 'myapp-cluster'
+    S3_BUCKET = 'myapp-flask-bucket'
+  }
+
+  stages {
+    stage('Build') {
+      steps {
+        sh "docker build -t ${ECR}:${BUILD_NUMBER} ."
+      }
+    }
+    stage('Push to ECR') {
+      steps { 
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+        sh """
+          aws ecr get-login-password --region ${AWS_REGION} |
+          docker login --username AWS --password-stdin ${ECR}
+          docker push ${ECR}:${BUILD_NUMBER}
+        """
+        }
+      }
+    }
+
+    stage('Create Deployment') {
+  steps {
+    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+      sh """
+        aws eks update-kubeconfig --name ${CLUSTER} --region ${AWS_REGION}
+        kubectl apply -f k8s/deployment.yml
+      """
+        }
+      }
     }
     
-    stages {
-        stage('Checkout') {
-            steps {
-                checkout scm
-            }
+    stage('Deploy to EKS') {
+      steps  {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+        sh """
+          aws eks update-kubeconfig --name ${CLUSTER} --region ${AWS_REGION}
+          kubectl get pods
+          kubectl set image deployment/flask-app flask-app=$ECR:${BUILD_NUMBER} --record
+          kubectl rollout status deployment/flask-app --timeout=120s
+        """
         }
-        
-        stage('Build') {
-            steps {
-                script {
-                    docker.build("${DOCKER_IMAGE}:${DOCKER_TAG}")
-                }
-            }
-        }
-        
-        stage('Test') {
-            steps {
-                script {
-                    docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").inside {
-                        sh 'npm test || echo "No tests defined"'
-                    }
-                }
-            }
-        }
-        
-        stage('Push to Registry') {
-            steps {
-                script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-credentials') {
-                        docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").push()
-                        docker.image("${DOCKER_IMAGE}:${DOCKER_TAG}").push('latest')
-                    }
-                }
-            }
-        }
-        
-        stage('Deploy') {
-            steps {
-                script {
-                    sh '''
-                        docker-compose down || true
-                        docker-compose up -d
-                    '''
-                }
-            }
-        }
+      }
     }
-    
-    post {
-        always {
-            sh 'docker system prune -f'
-        }
-        success {
-            echo 'Deployment successful!'
-        }
-        failure {
-            echo 'Deployment failed!'
-        }
+
+    stage('Expose Service') {
+  steps {
+    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+      sh """
+        aws eks update-kubeconfig --name ${CLUSTER} --region ${AWS_REGION}
+        kubectl apply -f k8s/service.yml
+      """
     }
+  }
 }
+
+    stage('Smoke Test') {
+      steps {
+        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+        
+      sh """
+        aws eks update-kubeconfig --name ${CLUSTER} --region ${AWS_REGION}
+        HOSTNAME=\$(kubectl get svc flask-app-svc -o jsonpath="{.status.loadBalancer.ingress[0].hostname}")
+        curl -f http://\${HOSTNAME}:5000
+      """
+
+        }
+      }
+    }
+  }
+  post {
+  success {
+    echo "Deployed ${BUILD_NUMBER}"
+  }
+  failure {
+    echo "Deploy failed, rolling back"
+    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+      sh """
+        aws eks update-kubeconfig --name ${CLUSTER} --region ${AWS_REGION}
+        kubectl rollout undo deployment/flask-app
+      """
+      }
+    }
+  }
+}
+
