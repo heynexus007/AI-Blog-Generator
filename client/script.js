@@ -8,6 +8,7 @@ const blogContent = document.getElementById('blogContent');
 const errorSection = document.getElementById('error');
 const errorText = document.getElementById('errorText');
 const copyBtn = document.getElementById('copyBtn');
+const pdfBtn = document.getElementById('pdfBtn');
 const newPostBtn = document.getElementById('newPostBtn');
 const resultKeywords = document.getElementById('resultKeywords');
 const resultTone = document.getElementById('resultTone');
@@ -109,6 +110,73 @@ copyBtn.addEventListener('click', async () => {
         }
         
         document.body.removeChild(textArea);
+    }
+});
+
+// PDF generation functionality
+pdfBtn.addEventListener('click', async () => {
+    try {
+        const originalText = pdfBtn.textContent;
+        pdfBtn.textContent = '⏳ Generating...';
+        pdfBtn.disabled = true;
+        
+        const response = await fetch('/generate-pdf', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                content: blogContent.textContent,
+                metadata: {
+                    keywords: resultKeywords.textContent.replace('Keywords: ', ''),
+                    tone: resultTone.textContent.replace('Tone: ', ''),
+                    length: resultLength.textContent.replace('Length: ', '')
+                }
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to generate PDF');
+        }
+        
+        const contentType = response.headers.get('content-type');
+        
+        if (contentType && contentType.includes('application/pdf')) {
+            // Server-side PDF generation successful
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'blog-post.pdf';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        } else {
+            // Fallback to client-side PDF generation
+            const data = await response.json();
+            if (data.html) {
+                const printWindow = window.open('', '_blank');
+                printWindow.document.write(data.html);
+                printWindow.document.close();
+                printWindow.focus();
+                setTimeout(() => {
+                    printWindow.print();
+                }, 500);
+            }
+        }
+        
+        pdfBtn.textContent = '✅ Generated!';
+        setTimeout(() => {
+            pdfBtn.textContent = originalText;
+            pdfBtn.disabled = false;
+        }, 2000);
+        
+    } catch (error) {
+        console.error('PDF generation failed:', error);
+        showError('Failed to generate PDF: ' + error.message);
+        pdfBtn.textContent = '📄 Generate PDF';
+        pdfBtn.disabled = false;
     }
 });
 

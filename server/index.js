@@ -4,6 +4,14 @@ const path = require('path');
 const fetch = require('node-fetch');
 require('dotenv').config({ path: path.join(__dirname, '.env') });
 
+// Optional puppeteer import
+let puppeteer;
+try {
+  puppeteer = require('puppeteer');
+} catch (error) {
+  console.log('Puppeteer not available - PDF generation will use fallback method');
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 
@@ -158,6 +166,130 @@ app.post('/generate', async (req, res) => {
       error: 'Failed to generate blog content',
       details: error.message 
     });
+  }
+});
+
+// PDF generation endpoint
+app.post('/generate-pdf', async (req, res) => {
+  try {
+    const { content, metadata } = req.body;
+    
+    if (!content) {
+      return res.status(400).json({ error: 'Content is required' });
+    }
+
+    if (puppeteer) {
+      try {
+        const browser = await puppeteer.launch({ headless: 'new', args: ['--no-sandbox'] });
+      const page = await browser.newPage();
+      
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Blog Post</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+            .header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
+            .title { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+            .meta { color: #666; font-size: 14px; }
+            .content { font-size: 16px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="title">AI Generated Blog Post</div>
+            <div class="meta">
+              Keywords: ${metadata?.keywords || 'N/A'} | 
+              Tone: ${metadata?.tone || 'N/A'} | 
+              Length: ${metadata?.length || 'N/A'}
+            </div>
+          </div>
+          <div class="content">${content.replace(/\n/g, '<br>')}</div>
+        </body>
+        </html>
+      `;
+      
+      await page.setContent(html);
+      const pdf = await page.pdf({ format: 'A4', margin: { top: '20mm', bottom: '20mm', left: '20mm', right: '20mm' } });
+      
+      await browser.close();
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', 'attachment; filename="blog-post.pdf"');
+      res.send(pdf);
+      
+      } catch (puppeteerError) {
+        console.log('Puppeteer launch failed, returning HTML for client-side PDF generation');
+        
+        const html = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <title>Blog Post</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+              .header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
+              .title { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+              .meta { color: #666; font-size: 14px; }
+              .content { font-size: 16px; }
+            </style>
+          </head>
+          <body>
+            <div class="header">
+              <div class="title">AI Generated Blog Post</div>
+              <div class="meta">
+                Keywords: ${metadata?.keywords || 'N/A'} | 
+                Tone: ${metadata?.tone || 'N/A'} | 
+                Length: ${metadata?.length || 'N/A'}
+              </div>
+            </div>
+            <div class="content">${content.replace(/\n/g, '<br>')}</div>
+          </body>
+          </html>
+        `;
+        
+        res.json({ html, fallback: true });
+      }
+    } else {
+      console.log('Puppeteer not available, returning HTML for client-side PDF generation');
+      
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Blog Post</title>
+          <style>
+            body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+            .header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
+            .title { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+            .meta { color: #666; font-size: 14px; }
+            .content { font-size: 16px; }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="title">AI Generated Blog Post</div>
+            <div class="meta">
+              Keywords: ${metadata?.keywords || 'N/A'} | 
+              Tone: ${metadata?.tone || 'N/A'} | 
+              Length: ${metadata?.length || 'N/A'}
+            </div>
+          </div>
+          <div class="content">${content.replace(/\n/g, '<br>')}</div>
+        </body>
+        </html>
+      `;
+      
+      res.json({ html, fallback: true });
+    }
+    
+  } catch (error) {
+    console.error('PDF generation error:', error);
+    res.status(500).json({ error: 'Failed to generate PDF' });
   }
 });
 

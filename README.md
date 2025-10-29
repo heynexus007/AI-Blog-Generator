@@ -53,3 +53,4 @@ ai-blog-generator/
 - **Frontend**: HTML5, CSS3, JavaScript
 - **AI Service**: Nebius AI (Meta-Llama-3.1-70B-Instruct)
 - **Styling**: CSS Grid, Flexbox, Responsive Design
+

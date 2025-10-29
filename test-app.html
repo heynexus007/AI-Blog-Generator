@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>AI Blog Generator - Standalone Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        .container { max-width: 800px; margin: 0 auto; background: white; padding: 40px; border-radius: 15px; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select { width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 5px; }
+        button { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px 30px; border: none; border-radius: 5px; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        .result { margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 5px; }
+        .actions { margin-top: 15px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🤖 AI Blog Generator - Standalone Version</h1>
+        <p>This version works without a server for testing purposes.</p>
+        
+        <form id="blogForm">
+            <div class="form-group">
+                <label for="keywords">Keywords/Topic *</label>
+                <input type="text" id="keywords" placeholder="e.g., artificial intelligence" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="tone">Tone *</label>
+                <select id="tone" required>
+                    <option value="">Select tone...</option>
+                    <option value="casual">Casual</option>
+                    <option value="formal">Formal</option>
+                    <option value="professional">Professional</option>
+                    <option value="friendly">Friendly</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="length">Length *</label>
+                <select id="length" required>
+                    <option value="">Select length...</option>
+                    <option value="short">Short (150-200 words)</option>
+                    <option value="medium">Medium (300-400 words)</option>
+                    <option value="long">Long (500-600 words)</option>
+                </select>
+            </div>
+            
+            <button type="submit">Generate Blog Post</button>
+        </form>
+        
+        <div id="result" style="display: none;" class="result">
+            <h2>Generated Blog Post</h2>
+            <div id="metadata"></div>
+            <div id="content"></div>
+            <div class="actions">
+                <button onclick="copyContent()">📋 Copy to Clipboard</button>
+                <button onclick="generatePDF()">📄 Generate PDF</button>
+                <button onclick="newPost()">✨ Generate New Post</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const mockBlogs = {
+            casual: {
+                short: "Hey there! Let's dive into {keywords}. It's pretty cool stuff that everyone should know about. The basics are simple - just think of it as your everyday solution to common problems. Whether you're a beginner or just curious, this topic has something for everyone. Keep exploring and you'll discover amazing things!",
+                medium: "Hey there! Let's talk about {keywords} - it's one of those topics that sounds complicated but is actually pretty straightforward once you get the hang of it. First off, you should know that this isn't just some trendy buzzword. It's real, practical stuff that can make a difference in your daily life. The cool thing is how it connects different aspects of what we do. Think about it this way: every time you encounter a challenge, there's probably a solution related to this topic. The key is understanding the fundamentals and then building from there. Don't worry if it seems overwhelming at first - we've all been there!",
+                long: "Hey there! Ready to dive deep into {keywords}? Buckle up because we're going on quite the journey today. This topic has been gaining serious traction lately, and for good reason. It's not just another passing trend - it's something that's reshaping how we think about solutions and possibilities. Let me start by sharing why this matters so much. In today's fast-paced world, we're constantly looking for ways to improve, optimize, and innovate. That's exactly where this comes in. The beauty of this subject lies in its versatility and practical applications. Whether you're dealing with everyday challenges or complex problems, the principles remain surprisingly consistent. What I love most about this topic is how it breaks down barriers between different fields and brings people together around common goals. The learning curve might seem steep initially, but trust me, once you grasp the core concepts, everything else starts falling into place naturally."
+            },
+            formal: {
+                short: "This document examines {keywords} and its significant implications. The analysis reveals key factors that contribute to its effectiveness and widespread adoption. Current research indicates substantial benefits across multiple sectors. Implementation requires careful consideration of various parameters and stakeholder requirements. Further investigation is recommended to fully understand the long-term impact.",
+                medium: "This comprehensive analysis examines {keywords} within the current technological and business landscape. The research methodology employed systematic evaluation of existing literature and practical applications. Key findings indicate that implementation of these concepts results in measurable improvements across operational efficiency, cost reduction, and strategic positioning. The study reveals three primary factors contributing to successful adoption: proper planning, stakeholder engagement, and continuous monitoring. Organizations that have implemented these practices report significant competitive advantages. However, challenges remain in areas of resource allocation and change management.",
+                long: "This extensive research paper provides a thorough examination of {keywords} and its transformative impact on contemporary business practices and technological advancement. The investigation employs a multi-faceted approach, incorporating quantitative analysis, qualitative assessments, and comparative studies across various industry sectors. The methodology includes comprehensive literature review, stakeholder interviews, and empirical data collection from multiple sources. Findings demonstrate that organizations implementing these concepts experience significant improvements in operational efficiency, with average productivity increases of 25-40% reported across different sectors. The analysis identifies several critical success factors: strategic alignment with organizational objectives, comprehensive staff training and development programs, robust technological infrastructure, and continuous performance monitoring systems."
+            },
+            professional: {
+                short: "Our analysis of {keywords} demonstrates significant potential for organizational improvement and strategic advancement. Key performance indicators show measurable benefits in efficiency, productivity, and cost optimization. Implementation requires structured approach with clear milestones and success metrics. We recommend immediate evaluation of current capabilities and development of comprehensive implementation roadmap.",
+                medium: "Executive Summary: Our comprehensive evaluation of {keywords} reveals substantial opportunities for organizational enhancement and competitive advantage. The assessment indicates that strategic implementation of these concepts can deliver significant returns on investment while improving operational efficiency. Key Benefits: Analysis shows average productivity improvements of 30%, cost reductions of 15-20%, and enhanced customer satisfaction scores. The implementation framework requires systematic approach including stakeholder analysis, resource planning, and phased deployment strategy.",
+                long: "Executive Summary: This strategic analysis presents a comprehensive evaluation of {keywords} and its potential impact on organizational performance, competitive positioning, and long-term sustainability. Our research methodology incorporated extensive market analysis, stakeholder consultations, and benchmarking studies across industry leaders. Strategic Importance: The current business environment demands innovative approaches to maintain competitive advantage. Our analysis indicates that organizations implementing these concepts achieve superior performance metrics, including enhanced operational efficiency, improved customer engagement, and stronger market positioning."
+            },
+            friendly: {
+                short: "Hi friend! I'm so excited to share some thoughts about {keywords} with you today! This is such a fascinating topic that I think you'll really enjoy learning about. The best part is how it can make things easier and more enjoyable in your daily life. I've seen so many people benefit from understanding this better, and I'm confident you will too. Let's explore this together!",
+                medium: "Hello there, wonderful reader! I'm absolutely thrilled to chat with you about {keywords} today - it's one of my favorite topics to discuss! You know what I love most about this subject? It's how it brings people together and creates these amazing 'aha!' moments when everything suddenly clicks. I remember when I first learned about this, I was amazed by how simple yet powerful the concepts really are. The beautiful thing is that once you understand the basics, you start seeing applications everywhere in your life.",
+                long: "Hey there, amazing human! I am SO excited to dive into this incredible topic of {keywords} with you today! Seriously, this is going to be such a fun and enlightening conversation. I've been passionate about this subject for quite some time now, and every time I get to share it with someone new, I get butterflies of excitement! Let me tell you why this topic is so close to my heart. It's not just about the technical aspects or the practical benefits (though those are fantastic too!). It's about the way it transforms how we think, how we approach challenges, and how we connect with others who share similar interests."
+            }
+        };
+
+        document.getElementById('blogForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const keywords = document.getElementById('keywords').value;
+            const tone = document.getElementById('tone').value;
+            const length = document.getElementById('length').value;
+            
+            if (!keywords || !tone || !length) {
+                alert('Please fill in all fields');
+                return;
+            }
+            
+            const content = mockBlogs[tone][length].replace('{keywords}', keywords);
+            
+            document.getElementById('metadata').innerHTML = `
+                <p><strong>Keywords:</strong> ${keywords} | <strong>Tone:</strong> ${tone} | <strong>Length:</strong> ${length}</p>
+            `;
+            document.getElementById('content').textContent = content;
+            document.getElementById('result').style.display = 'block';
+            
+            document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+        });
+        
+        function copyContent() {
+            const content = document.getElementById('content').textContent;
+            navigator.clipboard.writeText(content).then(() => {
+                alert('Content copied to clipboard!');
+            });
+        }
+        
+        function generatePDF() {
+            const content = document.getElementById('content').textContent;
+            const metadata = document.getElementById('metadata').textContent;
+            
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <title>Blog Post</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; margin: 40px; line-height: 1.6; }
+                        .header { border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
+                        .title { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
+                        .meta { color: #666; font-size: 14px; }
+                        .content { font-size: 16px; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <div class="title">AI Generated Blog Post</div>
+                        <div class="meta">${metadata}</div>
+                    </div>
+                    <div class="content">${content}</div>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.focus();
+            setTimeout(() => {
+                printWindow.print();
+            }, 500);
+        }
+        
+        function newPost() {
+            document.getElementById('result').style.display = 'none';
+            document.getElementById('blogForm').reset();
+            document.getElementById('keywords').focus();
+        }
+        
+        // Auto-focus on page load
+        document.getElementById('keywords').focus();
+    </script>
+</body>
+</html>
