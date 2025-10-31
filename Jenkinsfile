@@ -3,7 +3,7 @@ pipeline {
   environment {
     AWS_REGION = 'us-east-1'
     AWS_ACCOUNT_ID = '325204716520'
-    ECR = '${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/myapp-ecr'
+    ECR = '${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/ai-blog-ecr'
     CLUSTER = 'ai-blog-cluster'
     S3_BUCKET = 'ai-blog-bucket'
   }
