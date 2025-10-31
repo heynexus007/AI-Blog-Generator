@@ -26,29 +26,35 @@ pipeline {
       }
     }
 
-    stage('Create Deployment') {
+  //   stage('Create Deployment') {
+  // steps {
+  //   withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
+  //     sh """
+  //       aws eks update-kubeconfig --name ${CLUSTER} --region ${AWS_REGION}
+  //       kubectl apply -f k8s/deployment.yml
+  //     """
+  //       }
+  //     }
+  //   }
+    
+    stage('Deploy to ECS') {
   steps {
     withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
       sh """
-        aws eks update-kubeconfig --name ${CLUSTER} --region ${AWS_REGION}
-        kubectl apply -f k8s/deployment.yml
+        TASK_DEF=\$(aws ecs describe-task-definition --task-definition ${ECS_TASK_FAMILY})
+        NEW_IMAGE="${ECR}:${BUILD_NUMBER}"
+        echo \$TASK_DEF | jq --arg IMAGE "\$NEW_IMAGE" '.taskDefinition |
+          .containerDefinitions[0].image = \$IMAGE |
+          del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' > new-task-def.json
+
+        NEW_TASK_DEF_ARN=\$(aws ecs register-task-definition --cli-input-json file://new-task-def.json | jq -r ".taskDefinition.taskDefinitionArn")
+
+        aws ecs update-service --cluster ${ECS_CLUSTER} --service ${ECS_SERVICE} --task-definition \$NEW_TASK_DEF_ARN --force-new-deployment
+        aws ecs wait services-stable --cluster ${ECS_CLUSTER} --service ${ECS_SERVICE}
       """
-        }
-      }
     }
-    
-    stage('Deploy to EKS') {
-      steps  {
-        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-creds']]) {
-        sh """
-          aws eks update-kubeconfig --name ${CLUSTER} --region ${AWS_REGION}
-          kubectl get pods
-          kubectl set image deployment/flask-app flask-app=$ECR:${BUILD_NUMBER} --record
-          kubectl rollout status deployment/flask-app --timeout=120s
-        """
-        }
-      }
-    }
+  }
+}
 
     stage('Expose Service') {
   steps {
