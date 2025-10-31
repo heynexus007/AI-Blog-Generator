@@ -2,10 +2,10 @@ pipeline {
   agent any
   environment {
     AWS_REGION = 'us-east-1'
-    AWS_ACCOUNT_ID = '248547463735'
+    AWS_ACCOUNT_ID = '325204716520'
     ECR = '${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/myapp-ecr'
-    CLUSTER = 'myapp-cluster'
-    S3_BUCKET = 'myapp-flask-bucket'
+    CLUSTER = 'ai-blog-cluster'
+    S3_BUCKET = 'ai-blog-bucket'
   }
 
   stages {
